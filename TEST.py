@@ -1,33 +1,46 @@
 import numpy as np
-from sympy import symbols, Eq, solve, Matrix
-# 뉴튼랩슨 방법 (1.역함수)
+from sympy import Matrix, symbols
+from Func import GaussianElimination_BackSubstitution
+
 x1, x2 = symbols('x1 x2')
-
-
-'''f = [0, 0]
-f[0] = x1 + x2
-f[1] = x1*x2'''
-
+x = Matrix([x1, x2])
 f = Matrix([x1+x2, x1*x2])
+# x = np.array([x1, x2])
+# f = np.array([x1+x2, x1*x2])
+size_mtx = len(f)
 
-f_prime = f[0].diff(x1)
-func_num = 2
-
-x = [x1, x2]
-
-'''for i in range(func_num):
-    print("i", i)
-    for j in range(func_num):
-        print("j", j)
-        J[i][j] = f[i].diff(x[j])'''
-J = Matrix(2, 2, lambda i, j: f[i].diff(x[j]))
-
-J_inv = J.inv()
-
-#Jinv 구했고 다음으로 x 계산!
-
-x_init = Matrix([4, 9])
-x_pre = x_init
+# initial values
 y = Matrix([15, 50])
-x = x_pre + J_inv @ (y - f(x_pre))
+x_val = Matrix([4, 9])
+del_y = 0
+del_x = 0
 
+# phase 1
+# y_pre = y.copy()
+del_y = y - f.subs({x1:x[0], x2:x[1]})
+del_y = del_y.subs({x[i]:x_val[i] for i in range(size_mtx)})
+del_y = np.array(del_y, dtype=float)
+# print(del_y)
+
+# phase 2
+J = Matrix(size_mtx, size_mtx, lambda i, j: f[i].diff(x[j]))
+J_val = J.subs({x[i]: x_val[i] for i in range(size_mtx)})
+J_val = np.array(J_val, dtype=float)
+# print(J_val)
+
+# phase 3
+del_x = GaussianElimination_BackSubstitution(J_val, del_y)
+del_x = Matrix(del_x)
+
+# phase 4 여기서 ,mtx size가 문제가 됨. 모든 행렬을 다 array로 바꾸던지 Matrix로 바꾸던지 해야할 듯.
+x_pre = np.array(x_val, dtype=float)
+print("x_pre : ", x_pre)
+print("del_x : ", del_x)
+x_val = x_pre + del_x  # x_val 갱신
+print(x_val)
+
+# 4단계: x_pre 갱신
+# x_pre = np.array(x_val, dtype=float)  # x_val을 numpy array로 변환
+# print("x_pre:", x_pre)
+# x_val = x_pre + del_x  # x_val 갱신
+# print("x_val 갱신 결과:", x_val)
