@@ -20,6 +20,11 @@ def BackSubstitution(A, y):
         x[i] = 1/A[i][i] * (y[i] - p)
     return x
 
+def GaussianElimination_BackSubstitution(A, y):
+    A, y = GaussianElimination(A, y);
+    x = BackSubstitution(A, y);
+    return x
+    
 #A = np.array([[10,5],[2,9]],dtype=float)
 #y = np.array([6,3],dtype=float)
 A = np.array([[2, 3, -1], [-4, 6, 8], [10,12,14]], dtype=float)
@@ -30,3 +35,7 @@ x = BackSubstitution(A, y);
 print("A", A)
 print("y", y)
 print("x", x)
+
+
+k = GaussianElimination_BackSubstitution(A, y)
+print("k", k)
