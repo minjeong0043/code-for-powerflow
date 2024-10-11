@@ -104,9 +104,51 @@ def Newton_Raphson(f, x, x_init, y):
             break
 
 # def Newton_Raphson_4phase(f, x, x_pre, y):
-#     size_mtx = len(f)
-#     del_x = 0
-#     del_y = 0
-#
-#     # phase 1
-#     del_y = y
+def Newton_Raphson_4phase(f, x, x_init, y):
+    # Jacobian Mtx
+    size_mtx = len(f)
+    J = Matrix(size_mtx, size_mtx, lambda i, j: f[i].diff(x[j]))
+    #J_inv = J.inv()
+    i = 0
+
+    x_val = x_init.copy()
+
+    del_y = 0
+    del_x = 0
+
+    while True:
+        # Phase 1
+        del_y = y - f.subs({x[i]: x[i] for i in range(size_mtx)})
+        del_y = del_y.subs({x[i]: x_val[i] for i in range(size_mtx)})
+        del_y = np.array(del_y, dtype=float)
+
+        # Phase 2
+        J = Matrix(size_mtx, size_mtx, lambda i, j:f[i].diff(x[j]))
+        J_val = J.subs({x[i]: x_val[i] for i in range(size_mtx)})
+        J_val = np.array(J_val, dtype=float)
+
+        # Phase 3
+        del_x = GaussianElimination_BackSubstitution(J_val, del_y)
+        del_x = Matrix(del_x)
+
+        # Phase 4
+        x_pre = np.array(x_val, dtype=float)
+        # print("x_pre : ", x_pre)
+        # print("del_x : ", del_x)
+        x_val = x_pre + del_x
+        # print("x_val : ", x_val)
+
+        e = np.zeros(size_mtx)
+        for k in range(size_mtx):
+            e[k] = np.abs((x_val[k] - x_pre[k]) / x_pre[k])
+        i += 1
+        if np.all(x_pre != 0):
+            if np.all(np.array(e, dtype=float) < 10 ** (-4)):
+                print("i = ", i)
+                print("e = ", np.array(e, dtype = float))
+                print("x = ", np.array(x_val, dtype=float))
+                break
+
+        if i > 1000:
+            print("Didn't converge until interation num 1000!!!!")
+            break
