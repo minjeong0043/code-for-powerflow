@@ -1,9 +1,6 @@
 import numpy as np
 from sympy import Matrix, symbols
 
-from TEST2 import size_mtx
-
-
 def GaussianElimination(A, y):
     # print("A" ,A)
     # print("Y", y)
