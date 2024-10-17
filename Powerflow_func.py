@@ -2,7 +2,7 @@ import numpy as np
 def TransformUnit(bus, Sbase):
     bus['Pload (MW)'] = bus['Pload (MW)'] / Sbase
     bus['Qload (MVAR)'] = bus['Qload (MVAR)'] / Sbase
-    bus.rname(colimns = {'Pload (MW)' : 'Pload (pu)', 'Qload (MVAR)' : 'Qlaod (pu)'})
+    bus.rename(columns = {'Pload (MW)' : 'Pload (pu)', 'Qload (MVAR)' : 'Qlaod (pu)'})
 
     return bus
 
