@@ -35,7 +35,7 @@ def Ybus(branch, size_Mtx):
     for i in range(size_Mtx):
         for j in range(size_Mtx):
             if i == j:
-                index = np.where(From ==i)[0]
+                index = np.where((From ==i) | (To == i))[0]
                 if index.size== 0:
                     Y[i,j] = 0
                 else:
