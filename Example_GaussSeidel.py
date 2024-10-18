@@ -63,9 +63,11 @@ while not converged and iteration < max_iter:
     print("V_given : ", V_given)
     del_P = abs(P_given[index_PV] - P_cal)
     # np.power(del_V, 2) = np.power(V_given, 2) - np.power(abs(V[index_PV]), 2) # del_V 는 크기임. 위상 x, V_given은 크기로 주어졌고 ,,,
-    del_V = (np.power(V_given, 2) - np.power(abs(V[index_PV], 2)))**0.5
+    # del_V = abs((np.power(V_given, 2) - np.power(abs(V[index_PV]), 2))**0.5)
+    del_V = (abs(np.power(V_given, 2)) - abs(np.power(abs(V[index_PV]), 2))) ** 0.5
     # del_P = abs(V)
     print("V[index_PV]                          : ",V[index_PV])
+    print(f"V[index_PV] = {V[index_PV]},                    del_V = {del_V}")
 
     if ((del_P < tolerance) and (del_V < tolerance)):
         converged = True
