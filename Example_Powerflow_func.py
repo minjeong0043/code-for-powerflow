@@ -82,3 +82,36 @@ def GaussSeidel_PQ(bus, bus_index, V, Y):
 
     return V
 
+def GaussSeidel_PV(bus, bus_index, V, Y):
+    P_given = bus['PG (pu)'] - bus['PL (pu)']
+    V_given = bus['V (pu)'][bus_index]
+    Q = 0
+    V_given = V[bus_index]
+
+    tolerance = 1e-6
+    max_iter = 100
+    iteration = 0
+    converged = False
+
+    while not converged and iteration < max_iter:
+        P_cal, Q_cal = Cal_PQ(V, Y, bus_index, len(bus))
+        del_P = abs(P_given[bus_index] - P_cal)
+        del_V = abs(abs(V_given) - abs(V[bus_index]))
+        Q = Q_cal
+        # print(f"del_P : {del_P},                          del_V : {del_V},                 V : {V[bus_index]}")
+        if ((del_P < tolerance) and (del_V < tolerance)):
+            converged = True
+            print(f"Converged at i = {iteration}, V = {V[bus_index]}")
+            break
+
+        b = 0
+        for j in range(len(bus)):
+            if bus_index != j:
+                b += Y[bus_index,j] * V[j]
+        V_new = (1/Y[bus_index, bus_index]) * (((P_given[bus_index] - 1j* Q) / V[bus_index].conjugate()) - b)
+        #위 식 다른 거로도 돌려보고 결과 비교해보기
+        V[bus_index] = V_given * np.exp(1j*np.angle(V_new))
+        iteration += 1
+        # print(f"iteration = {iteration}")
+
+    return V
