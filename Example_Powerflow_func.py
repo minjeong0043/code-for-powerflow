@@ -30,11 +30,13 @@ def Cal_PQ(V, Y, i, size_bus): # 전압 크기, 위상, 어드미턴스, bus i�
     delta = []
 
     # V 배열의 각 요소에 대해 크기와 각도 계산
-    for v in V:
-        v_val, v_delta = cmath.polar(v)
-        V_value.append(v_val)
-        delta.append(v_delta)
-
+    #for v in V:
+    #    v_val, v_delta = cmath.polar(v)
+    #    V_value.append(v_val)
+    #    delta.append(v_delta)
+    V_value = abs(V)
+    delta = np.angle(V)
+    
     # print("delta[i]", delta[i])
 
     P_cal = 0
