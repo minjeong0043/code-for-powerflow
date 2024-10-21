@@ -24,19 +24,86 @@ def Ybus(branch, size_Mtx):
 
     return Y
 
+def Ybus_considering_trans(bus, branch, transformer):
+    size_Mtx = len(bus)
+    Y = np.zeros([size_Mtx, size_Mtx], dtype=complex)
+
+    trans = []
+    index_trans = []
+    tap = np.zeros(len(branch))
+    for i in range(len(transformer)):
+        trans.append([transformer['From'][i], transformer['To'][i], transformer['Tap'][i]])
+
+    # 변압기 부분 branch에서의 index와 tap 재배치
+    for i in range(len(transformer)):
+        a = np.where((branch['From'] == trans[i][0]) & (branch['To'] == trans[i][1]))[0]
+        b = np.where((branch['From'] == trans[i][1]) & (branch['To'] == trans[i][0]))[0]
+        s = set(a) | set(b)
+        for k in s:
+            tap[k] = trans[i][2]
+        if len(s) != 0:
+            index_trans.append(s)
+    index_trans = [next(iter(s)) for s in index_trans] # set to list
+
+    #어드미턴스 계싼
+    for i in range(size_Mtx):
+        for j in range(size_Mtx):
+            if i == j:
+                index = np.where((branch['From'] == i+1) | (branch['To'] == i+1))[0]
+                index_without_trans = set(index) - set(index_trans)
+                index_with_trans = set(index) & set(index_trans)
+
+                if len(index_without_trans) == 0:
+                    Y[i,j] += 0
+                else:
+                    for k in index_without_trans:
+                        Y[i,j] += 1/(branch['R (pu)'][k] + 1j*branch['X (pu)'][k]) + 1j*branch['B (pu)'][k]/2
+
+                if len(index_with_trans) == 0:
+                    Y[i,j] += 0
+                else:
+                    for k in index_with_trans:
+                        Y[i,j] += (1/(branch['R (pu)'][k] + 1j*branch['X (pu)'][k])) / np.power(tap[k], 2)
+            elif i != j:
+                index = np.where(((branch['From'] == i + 1) & (branch['To'] == j + 1)) | ((branch['From'] == j + 1) & (branch['To'] == i + 1)))[0]
+                index_without_trans = set(index) - set(index_trans)
+                index_with_trans = set(index) & set(index_trans)
+                # if len(index_with_trans) > 1 or len(index_without_trans) > 1: # 두 번씩 나타나는 애들
+                #     print(f"i, j = {i, j},            index_without_trans = {index_without_trans},                   index_with_trans = {index_with_trans}")
+                if (len(index_without_trans) != 0) and (len(index_with_trans) == 0):
+                    Y[i, j] = - 1 / (branch['R (pu)'][next(iter(index_without_trans))] + 1j * branch['X (pu)'][
+                        next(iter(index_without_trans))])
+                elif (len(index_with_trans) != 0) and (len(index_without_trans) == 0):
+                    Y[i, j] = - (1 / (branch['R (pu)'][next(iter(index_with_trans))] + 1j * branch['X (pu)'][
+                        next(iter(index_with_trans))])) / tap[next(iter(index_with_trans))]
+                    # print(f"i, j = {i, j},            index_without_trans = {index_without_trans},                   index_with_trans = {index_with_trans}")
+                elif (len(index_with_trans) == 0) and (len(index_without_trans) == 0):
+                    # print(f"i, j = {i, j},            index_without_trans = {index_without_trans},                   index_with_trans = {index_with_trans}")
+                    Y[i, j] = 0
+                else:
+                    print("WWWWWWWWWWWWWOOOOOOOOOOOOOOOOOWWWWWWWW")
+
+    return Y
+
+
+
+
+
+
 def Cal_PQ(V, Y, i, size_bus): # 전압 크기, 위상, 어드미턴스, bus i에서의 계산 PQ 전력
     # V_value, delta = cmath.polar(V)
     V_value = []
     delta = []
 
     # V 배열의 각 요소에 대해 크기와 각도 계산
-    #for v in V:
-    #    v_val, v_delta = cmath.polar(v)
-    #    V_value.append(v_val)
-    #    delta.append(v_delta)
+    # for v in V:
+    #     v_val, v_delta = cmath.polar(v)
+    #     V_value.append(v_val)
+    #     delta.append(v_delta)
+
     V_value = abs(V)
     delta = np.angle(V)
-    
+
     # print("delta[i]", delta[i])
 
     P_cal = 0
