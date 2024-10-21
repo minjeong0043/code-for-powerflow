@@ -24,10 +24,6 @@ def Ybus(branch, size_Mtx):
 
     return Y
 
-# def GaussSeidel_PQ():
-#     while True:
-#         del =
-
 def Cal_PQ(V, Y, i, size_bus): # 전압 크기, 위상, 어드미턴스, bus i에서의 계산 PQ 전력
     # V_value, delta = cmath.polar(V)
     V_value = []
