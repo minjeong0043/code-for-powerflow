@@ -147,9 +147,14 @@ def GaussSeidel_PQ(data_path, bus_index, V, Y):
     PG = np.zeros(len(bus_pu))
     QG = np.zeros(len(bus_pu))
     for i in range(len(generator_pu)):
-        # print(f"generator_pu['Bus'][i] : {generator_pu['Bus'][i]}")
-        PG[generator_pu['Bus'][i] - 1] += generator_pu['PG (pu)'][i]
-        QG[generator_pu['Bus'][i] - 1] += generator_pu['QG (pu)'][i]
+        # print(f"generator_pu['Bus'][i] : {generator_pu['Bus'][i]}, PG : {generator_pu['PG (pu)'][i]}")
+        # PG[generator_pu['Bus'][i] - 1] += generator_pu['PG (pu)'][i]
+        # QG[generator_pu['Bus'][i] - 1] += generator_pu['QG (pu)'][i]
+        PG[generator_pu['Bus'][i] - 1] = generator_pu['PG (pu)'][i]
+        QG[generator_pu['Bus'][i] - 1] = generator_pu['QG (pu)'][i]
+
+    # print(f"PG : {PG}")
+
 
     P_given = PG - bus_pu['Pload (pu)']
     Q_given = QG - bus_pu['Qload (pu)']
@@ -166,14 +171,24 @@ def GaussSeidel_PQ(data_path, bus_index, V, Y):
         # print(f"del_P : {del_P},                          del_Q : {del_Q},                 V : {V[bus_index]}")
         if ((del_P < tolerance) and (del_Q < tolerance)):
             converged = True
-            print(f"Converged at i = {iteration}, V = {V[bus_index]}")
+            # print(f"Converged at i = {iteration}, V = {V[bus_index]}")
             break
 
         b = 0
         for j in range(len(bus_pu)):
-            if bus_index != j:
+            if bus_index != j: # 자기 자신이 아닌 거에서만
                 b += Y[bus_index,j] * V[j]
-        V[bus_index] = (1/Y[bus_index, bus_index]) * (((P_given[bus_index] - 1j* Q_given[bus_index]) / V[bus_index].conjugate()) - b)
+        # V[bus_index] = (1/Y[bus_index, bus_index]) * (((P_given[bus_index] - 1j* Q_given[bus_index]) / V[bus_index].conjugate()) - b)
+        V_new = (1/Y[bus_index, bus_index]) * (((P_given[bus_index] - 1j* Q_given[bus_index]) / V[bus_index].conjugate()) - b)
+        V_mag = np.abs(V_new)
+        if V_mag < bus_pu['minVm'][bus_index]:
+            print(f"Voltage magnitude is out of range : {V_mag}")
+            V[bus_index] = bus_pu['minVm'][bus_index] * np.exp(1j * np.angle(V_new)) # 이렇게 해도 되나 생각해보자
+        elif V_mag > bus_pu['maxVm'][bus_index]:
+            print(f"Voltage magnitude is out of range : {V_mag}")
+            V[bus_index] = bus_pu['maxVm'][bus_index] * np.exp(1j * np.angle(V_new))
+        else:
+            V[bus_index] = V_new
 
         iteration += 1
         # print(f"iteration = {iteration}")
@@ -181,13 +196,15 @@ def GaussSeidel_PQ(data_path, bus_index, V, Y):
     return V
 
 def GaussSeidel_PV(data_path, bus_index, V, Y):
-    bus_pu, branch, transformer, generator_pu, Sbase = ReadData_Unit_pu(data_path)
+    bus_pu, branch, transformer, generator_pu, _ = ReadData_Unit_pu(data_path)
     PG = np.zeros(len(bus_pu))
     QG = np.zeros(len(bus_pu))
     for i in range(len(generator_pu)):
         # print(f"generator_pu['Bus'][i] : {generator_pu['Bus'][i]}")
-        PG[generator_pu['Bus'][i] - 1] += generator_pu['PG (pu)'][i]
-        QG[generator_pu['Bus'][i] - 1] += generator_pu['QG (pu)'][i]
+        # PG[generator_pu['Bus'][i] - 1] += generator_pu['PG (pu)'][i]
+        # QG[generator_pu['Bus'][i] - 1] += generator_pu['QG (pu)'][i]
+        PG[generator_pu['Bus'][i] - 1] = generator_pu['PG (pu)'][i]
+        QG[generator_pu['Bus'][i] - 1] = generator_pu['QG (pu)'][i]
 
     P_given = PG - bus_pu['Pload (pu)']
     Q = 0
@@ -201,12 +218,14 @@ def GaussSeidel_PV(data_path, bus_index, V, Y):
     while not converged and iteration < max_iter:
         P_cal, Q_cal = Cal_PQ(V, Y, bus_index, len(bus_pu))
         del_P = abs(P_given[bus_index] - P_cal)
-        del_V = abs(abs(V_given) - abs(V[bus_index]))
+        # del_V = abs(abs(V_given) - abs(V[bus_index]))
+        # del_V = abs(V_given[bus_index] - abs(V[bus_index]))
+        del_V = abs(V_given[bus_index] - abs(V[bus_index]))
         Q = Q_cal
         # print(f"del_P : {del_P},                          del_V : {del_V},                 V : {V[bus_index]}")
         if ((del_P < tolerance) and (del_V < tolerance)):
             converged = True
-            print(f"Converged at i = {iteration}, V = {V[bus_index]}")
+            # print(f"Converged at i = {iteration}, V = {V[bus_index]}")
             break
 
         b = 0
@@ -215,7 +234,13 @@ def GaussSeidel_PV(data_path, bus_index, V, Y):
                 b += Y[bus_index,j] * V[j]
         V_new = (1/Y[bus_index, bus_index]) * (((P_given[bus_index] - 1j* Q) / V[bus_index].conjugate()) - b)
         #위 식 다른 거로도 돌려보고 결과 비교해보기
-        V[bus_index] = V_given * np.exp(1j*np.angle(V_new))
+        # print("!")
+        # print(f"type : {type(bus_index)}        {type(V_given)}            {type(V_new)}         {type(V)}")
+        # print(f'           {V_given}              {V}')
+        # V_given = np.array(V_given)
+        # V = np.array(V)
+        V[bus_index] = V_given[bus_index] * np.exp(1j*np.angle(V_new))
+        # print("1!!!!!!!!!!!!")
         iteration += 1
         # print(f"iteration = {iteration}")
 
