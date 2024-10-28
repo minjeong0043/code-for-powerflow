@@ -117,6 +117,65 @@ def Ybus_considering_trans(bus, branch, transformer):
 
     return Y
 
+def Ybus_considering_trans2(bus, branch, transformer):
+    trans = []
+    index_trans = []
+    for i in range(len(transformer)):
+        for j in range(len(branch)):
+            if (((branch['From'][j] == transformer['From'][i]) & (branch['To'][j] == transformer['To'][i])) | (
+                    (branch['From'][j] == transformer['To'][i]) & (branch['To'][j] == transformer['From'][i]))):
+                # From, To, tap, index in branch sheet
+                trans.append([transformer['From'][i], transformer['To'][i], transformer['Tap'][i], j])
+                index_trans.append(j)
+
+    Y = np.zeros([len(bus), len(bus)], dtype=complex)
+    for i in range(len(bus)):
+        for j in range(len(bus)):
+            if i == j:
+                index = np.where((branch['From'] == i + 1) | (branch['To'] == i + 1))[0]
+                if len(set(index) & set(index_trans)) == 0:
+                    # print(f"index: {index}                          index_trans : {index_trans}              set(index)&set(index_trans) : {set(index)&set(index_trans)}")
+                    for k in index:
+                        Y[i, j] += 1 / (branch['R (pu)'][k] + 1j * branch['X (pu)'][k]) + 1j * branch['B (pu)'][k] / 2
+                elif len(set(index) & set(index_trans)) != 0:
+                    # print(f"index: {index}                          index_trans : {index_trans}              set(index)&set(index_trans) : {set(index)&set(index_trans)}")
+                    # print(set(index) - set(index_trans))
+                    for k in (set(index) - set(index_trans)):
+                        # print(f"k : {k}")
+                        Y[i, j] += 1 / (branch['R (pu)'][k] + 1j * branch['X (pu)'][k]) + 1j * branch['B (pu)'][k] / 2
+                    for k in (set(index) & set(index_trans)):
+                        # print(f"k & : {k}           branch['B (pu)'][k] : {branch['B (pu)'][k]}")
+                        # print(trans)
+                        # print([item for item in trans if item[3] == k][0][2])
+                        t = [item for item in trans if item[3] == k][0][2]
+                        # print(f"t : {t}          np.power(t) : {np.power(t, 2)}")
+                        Y[i, j] += (1 / (branch['R (pu)'][k] + 1j * branch['X (pu)'][k])) / np.power(t, 2)
+                # for k in index:
+                #     Y[i,j] += 1/ (branch['R (pu)'][k] + 1j*branch['X (pu)'][k]) + 1j*branch['B (pu)'][k]/2
+            elif i != j:
+                index = np.where(((branch['From'] == i + 1) & (branch['To'] == j + 1)) | (
+                            (branch['From'] == j + 1) & (branch['To'] == i + 1)))[0]
+                # print(f"i+1,j+1: {i+1, j+1}            index: {index}                          index_trans : {index_trans}              set(index)&set(index_trans) : {set(index) & set(index_trans)}")
+                if len(set(index) & set(index_trans)) == 0:
+                    # print(f"index: {index}                          index_trans : {index_trans}              set(index)&set(index_trans) : {set(index)&set(index_trans)}")
+                    if index.size == 0:
+                        Y[i, j] = 0
+                    else:
+                        Y[i, j] = -1 / (branch['R (pu)'][index[0]]) + 1j * branch['X (pu)'][index[0]]
+                elif len(set(index) & set(index_trans)) != 0:
+                    # print(f"index: {index}                          index_trans : {index_trans}              set(index)&set(index_trans) : {set(index) & set(index_trans)}")
+                    for k in (set(index) - set(index_trans)):
+                        print(f"k : {k}")
+                        Y[i, j] = -1 / (branch['R (pu)'][k]) + 1j * branch['X (pu)'][k]
+                    for k in (set(index) & set(index_trans)):
+                        # print(f"k : {k}")
+                        t = [item for item in trans if item[3] == k][0][2]
+                        # print(f"t : {t}          np.power(t) : {np.power(t, 2)}")
+                        # print(trans)
+                        # print(t)
+                        Y[i, j] = (-1 / (branch['R (pu)'][k] + 1j * branch['X (pu)'][k])) / t
+    return Y
+
 def Cal_PQ(V, Y, i, size_bus): # 전압 크기, 위상, 어드미턴스, bus i에서의 계산 PQ 전력
     # V_value, delta = cmath.polar(V)
     V_value = []
