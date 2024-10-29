@@ -54,7 +54,6 @@ for var in sym_variables:
         x[var] = 0
     if "V" in str(var):
         x[var] = 1
-# print(x)
 while not converged and iter < max_iter:
     # print(f"x :{x}")
     Ufunc_cal = Ufunc.subs(x)
@@ -70,10 +69,46 @@ while not converged and iter < max_iter:
     iter += 1
     # print(f"iter = {iter}")
 
-# Results
+## Results
 V_result, delta_result, P_result, Q_result = Result_values(x, bus_pu, V_mag, delta, Y_mag, Y_rad)
 
-# Data to excel
-data = {
+bus = []
+delta_result_degree = np.zeros(len(delta_result))
+for i in range(len(bus_pu)):
+    bus.append(i+1)
+    delta_result_degree = delta_result * 180 / np.pi
 
+## Save Data to excel file
+P_G = np.zeros(len(bus_pu))
+Q_G = np.zeros(len(bus_pu))
+P_load = np.zeros(len(bus_pu))
+Q_load = np.zeros(len(bus_pu))
+for i in range(len(generator_pu)):
+    print(generator_pu['Bus'] - 1)
+    P_G[generator_pu['Bus'] - 1] = generator_pu['PG (pu)'][i]
+    Q_G[generator_pu['Bus'] - 1] = generator_pu['QG (pu)'][i]
+for i in range(len(bus_pu)):
+    P_load[i] = bus_pu['Pload (pu)'][i]
+    Q_load[i] = bus_pu['Qload (pu)'][i]
+
+for i in range(len(bus_pu)):
+    if bus_pu['Type'][i] == 'Swing':
+        P_G[i] = P_result[i]
+        Q_G[i] = Q_result[i]
+    elif bus_pu['Type'][i] == 'PV':
+        Q_G[i] = Q_result[i] + Q_load[i]
+
+data = {
+    'Bus' : bus,
+    'Volt': V_result,
+    'Angle': delta_result_degree,
+    'PG': P_G,
+    'QG': Q_G,
+    'Pload': P_load,
+    'Qload': Q_load
 }
+
+df = pd.DataFrame(data)
+df.to_excel('powerflow_results.xlsx', index=False)
+
+print("The file has been saved!!!")
