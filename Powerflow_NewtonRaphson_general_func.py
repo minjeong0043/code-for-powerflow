@@ -213,8 +213,8 @@ def PQ_given(bus_pu, generator_pu):
 def NewtonRaphson(x, Ufunc, bus, U_given, J, indices_delta):
     Ufunc_cal = Ufunc.subs(x)
     # print(f"Ufunc_cal :{Ufunc_cal},    U_given : {U_given}")
-    del_U = np.zeros(len(bus))
-    for i in range(len(bus)):
+    del_U = np.zeros(len(U_given))
+    for i in range(len(U_given)):
         del_U[i] = U_given[i] - Ufunc_cal[i]
     del_U = sp.Matrix(del_U)
     # print(f"del_U : {del_U}")
