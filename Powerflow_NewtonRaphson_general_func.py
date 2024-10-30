@@ -1,6 +1,9 @@
 import pandas as pd
 import numpy as np
 import sympy as sp
+import time
+from scipy.linalg import lu_factor, lu_solve
+
 def Ybus(bus, branch):
     Y = np.zeros([len(bus), len(bus)], dtype=complex)
     Y_mag = np.zeros([len(bus), len(bus)], dtype=int)
@@ -82,7 +85,7 @@ def Ybus_with_transformer(bus, branch, transformer):
                 elif len(set(index) & set(index_trans)) != 0:
                     # print(f"index: {index}                          index_trans : {index_trans}              set(index)&set(index_trans) : {set(index) & set(index_trans)}")
                     for k in (set(index) - set(index_trans)):
-                        print(f"k : {k}")
+                        # print(f"k : {k}")
                         Y[i, j] = -1 / (branch['R (pu)'][k]) + 1j * branch['X (pu)'][k]
                     for k in (set(index) & set(index_trans)):
                         # print(f"k : {k}")
@@ -217,9 +220,12 @@ def NewtonRaphson(x, Ufunc, bus, U_given, J, indices_delta):
     for i in range(len(U_given)):
         del_U[i] = U_given[i] - Ufunc_cal[i]
     del_U = sp.Matrix(del_U)
-    # print(f"del_U : {del_U}")
+    # print(f"de_U : {del_U}")
     J_val = J.subs(x)
+    # print(f"matrix : {J_val @ del_U}")
+    # print(f"J_val.inv() : {J_val.inv()}")
     del_x = J_val.inv() @ del_U
+    # print(f"del_x : {del_x}")
     del_x_degree = del_x.copy()
     for i in range(len(indices_delta)):
         del_x_degree[i] = del_x[i] * 180 /np.pi
@@ -238,6 +244,112 @@ def NewtonRaphson(x, Ufunc, bus, U_given, J, indices_delta):
             x_new_degree[key] = np.array(x_values[i]) + del_x[i]
 
     return x_new, x_new_degree
+
+def NewtonRaphson2(x, Ufunc, bus, U_given, J, indices_delta): # do not have J.inv()
+    start_time = time.time()
+    Ufunc_cal = Ufunc.subs(x)
+    del_U = np.zeros(len(U_given))
+    for i in range(len(U_given)):
+        del_U[i] = U_given[i] - Ufunc_cal[i]
+    del_U = sp.Matrix(del_U)
+    # print(f"del_U :{del_U}")
+    J_val = J.subs(x)
+    print(f"J_val : {J_val}")
+    # GaussElimination
+    # J_val = J_val.applyfunc(lambda o: sp.Rational(o))
+    del_U_updated = sp.zeros(len(del_U), 1)
+    J_val_updated = sp.zeros(len(del_U), len(del_U))
+    J_val_updated[0, :] = J_val[0, :]
+    del_U_updated[0] = del_U[0]
+    for i in range(len(del_U)):
+        for j in range(i + 1, len(del_U)):
+            k = J_val[i, j] / J_val[i, i]
+            J_val_updated[j, :] = J_val.row(j) - k * J_val.row(i)
+            del_U_updated[j] = del_U[j] - k * del_U[i]
+    # J_val_updated = J_val_updated.evalf()
+    print(f"J_val+_updated :{J_val_updated}")
+    print(f"del_U_updated  :{del_U_updated}")
+
+    del_x = sp.zeros(len(del_U), 1)
+    del_x[-1] = 1 / J_val_updated[-1, -1] * del_U[-1]
+    print(f"-------------")
+    print(" -- %s seconds --- " % (time.time() - start_time))
+
+    for i in range(len(del_U) - 2, -1, -1):
+        p = 0
+        # for j in range(i + 1, len(del_U)):
+            # p += J_val_updated[i, j] * del_x[j]
+        p = np.dot(J_val_updated[i,i+1:], del_x[i+1:])
+        del_x[i] = 1 / J_val_updated[i, i] * (del_U_updated[i] - p)
+    print(f"del_x : {del_x}")
+    # del_x_1 = J_val.inv() @ del_U
+    # print(f"del_x :{del_x},          del_x_1 :{del_x_1}")
+    print(f"-------------")
+    print(" -- %s seconds --- " % (time.time() - start_time))
+    del_x_degree = del_x.copy()
+    for i in range(len(indices_delta)):
+        del_x_degree[i] = del_x[i] * 180 /np.pi
+
+    a = enumerate(x)
+    x_new = {}
+    x_new_degree = {}
+    x = x.values()
+    x_values = list(x)
+    # for i, key in enumerate(var0_dict):
+    for i, key in a:
+        x_new[key] = np.array(x_values[i]) + del_x[i]
+        if 'delta' in str(key):
+            x_new_degree[key] = (np.array(x_values[i]) + del_x[i]) * 180 / np.pi
+        else:
+            x_new_degree[key] = np.array(x_values[i]) + del_x[i]
+    print(f"x_new : {x_new}")
+    return x_new, x_new_degree
+
+
+def NewtonRaphson3(x, Ufunc, bus, U_given, J, indices_delta):
+    # start_time = time.time()
+    Ufunc_cal = Ufunc.subs(x).evalf()
+    del_U = np.zeros(len(U_given))
+
+    # Ufunc와 U_given 차이를 계산
+    for i in range(len(U_given)):
+        del_U[i] = float(U_given[i] - Ufunc_cal[i])
+    del_U = sp.Matrix(del_U)
+
+    # Jacobi 행렬 계산
+    J_val = J.subs(x).evalf()
+    J_val = np.array(J_val).astype(np.float64)  # Sympy 행렬을 numpy 배열로 변환
+    del_U = np.array(del_U).astype(np.float64)  # Sympy 행렬을 numpy 배열로 변환
+    print(f"                    J_val : {J_val} {type(J_val)}\ndel_U :{del_U} {type(del_U)}")
+    # LU 분해 적용 (scipy 라이브러리 사용)
+    lu, piv = lu_factor(J_val)  # LU 분해
+    del_x = lu_solve((lu, piv), del_U)  # LU 분해 결과로 연립 방정식 풀이
+
+    # print(f"del_x : {del_x}")
+    # print(" -- %s seconds --- " % (time.time() - start_time))
+
+    # 각 변수의 변화량을 라디안에서 각도로 변환
+    # del_x_degree = del_x.copy()
+    # for i in range(len(indices_delta)):
+    #     del_x_degree[i] = del_x[i] * 180 / np.pi
+
+    # 새로운 값 계산
+    a = enumerate(x)
+    x_new = {}
+    # x_new_degree = {}
+    x_values = list(x.values())
+    print(f"del_x[0] : {del_x[0]} {type(del_x[0])}")
+    # 각 변수에 대해 업데이트된 값을 계산
+    for i, key in a:
+        x_new[key] = np.array(x_values[i]) + del_x[i][0]
+        # print(f"np.array(x_values[i]) : {np.array(x_values[i])} {type(np.array(x_values[i]))}, {x_values[i]}, del_x : {del_x[i][0]}{type(del_x[i])}")
+        # if 'delta' in str(key):
+        #     x_new_degree[key] = (np.array(x_values[i]) + del_x[i][0]) * 180 / np.pi
+        # else:
+        #     x_new_degree[key] = np.array(x_values[i]) + del_x[i][0]
+
+    print(f"x_new : {x_new}")
+    return x_new, del_x
 
 def Result_values(x, bus_pu, V_mag, delta, Y_mag, Y_rad):
     V_result = np.empty(len(bus_pu), dtype=float)
@@ -282,8 +394,8 @@ def Result_values(x, bus_pu, V_mag, delta, Y_mag, Y_rad):
             Q_result[i] = V_result[i] * Q_result[i]
 
     # 결과 출력
-    print(f"V_result : {V_result}")
+    print(f"V_result     : {V_result}")
     print(f"delta_result : {delta_result}")
-    print(f"P_result : {P_result}")
-    print(f"Q_result : {Q_result}")
+    print(f"P_result     : {P_result}")
+    print(f"Q_result     : {Q_result}")
     return V_result, delta_result, P_result, Q_result
