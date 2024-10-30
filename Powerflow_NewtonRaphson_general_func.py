@@ -101,7 +101,7 @@ def Ybus_with_transformer(bus, branch, transformer):
             Y_degrees[i, j] = np.degrees(np.angle(Y[i, j]))
 
     Y_rad = sp.rad(Y_degrees)
-    return Y_mag, Y_rad
+    return Y_mag, Y_rad, Y
 
 def DefineVariable(bus_pu, generator_pu):
     V_mag_init = bus_pu['Vm (pu)'].copy()
@@ -200,6 +200,7 @@ def PQ_given(bus_pu, generator_pu):
             Q_given[i] = -bus_pu['Qload (pu)'][i]
         elif bus_pu['Type'][i] == 'PV':
             P_given[i] = PG[i] - bus_pu['Pload (pu)'][i]
+
             # print(f" i : {i},   PG {PG},       bus_pu :{isinstance(bus_pu['Pload (pu)'][i], np.float64())}")
 
     U_given = []
@@ -304,7 +305,6 @@ def NewtonRaphson2(x, Ufunc, bus, U_given, J, indices_delta): # do not have J.in
             x_new_degree[key] = np.array(x_values[i]) + del_x[i]
     print(f"x_new : {x_new}")
     return x_new, x_new_degree
-
 
 def NewtonRaphson3(x, Ufunc, bus, U_given, J, indices_delta):
     # start_time = time.time()

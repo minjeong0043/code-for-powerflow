@@ -4,7 +4,7 @@ import sympy as sp
 import time
 from Powerflow_NewtonRaphson_general_func import Ybus,Ybus_with_transformer, DefineVariable, Ufunc, Jacobian, PQ_given, NewtonRaphson, Result_values, NewtonRaphson2, NewtonRaphson3
 
-data_name = "ac_case25.xlsx"
+data_name = "ac_case5.xlsx"
 # data_name = "ac_case3_fin.xlsx"
 # Read Data
 bus = pd.read_excel(data_name, sheet_name='bus')
@@ -28,27 +28,30 @@ generator_pu = generator_pu.rename(columns = {'PG (MW)' : 'PG (pu)', 'QG (MVAR)'
 if transformer.size == 0:
     Y_mag, Y_rad = Ybus(bus_pu, branch)
 else:
-    Y_mag, Y_rad = Ybus_with_transformer(bus_pu, branch, transformer)
+    Y_mag, Y_rad, Y = Ybus_with_transformer(bus_pu, branch, transformer)
 # print(f"Y_mag : {Y_mag}\nY_rad : {Y_rad}")
+# print(f"Y : {Y}")
 
 ## Define Variable and initial value
 V_mag, delta, sym_variables, indices_delta = DefineVariable(bus_pu, generator_pu)
 # print(len(sym_variables))
 # print(sym_variables)
+
 ## PQ func
 Ufunc = Ufunc(bus_pu, Y_mag, Y_rad, V_mag, delta)
 # print(f"Ufunc : {Ufunc},  size :{Ufunc.shape}")
+
 ## Jacobian
 J = Jacobian(bus_pu, Ufunc, sym_variables)
-
+print(f"J : {J}")
 ## Given Data
 U_given = PQ_given(bus_pu, generator_pu)
 print(f"U_given :{U_given}")
 
 
 ## iteration
-# tolerance = 1e-6
-tolerance = 1
+tolerance = 1e-6
+# tolerance = 1
 max_iter = 10
 iteration = 0
 converged = False
@@ -61,6 +64,7 @@ for var in sym_variables:
     if "V" in str(var):
         x[var] = 1
 start_time = time.time()
+print(f"Jacobian_init : {J.subs(x).evalf()}")
 while not converged or iteration < max_iter:
     # print(f"x :{x}")
     # print(f"iter = {iteration}")
