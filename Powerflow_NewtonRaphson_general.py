@@ -1,13 +1,13 @@
 import pandas as pd
 import numpy as np
 import sympy as sp
-import time
-from Powerflow_NewtonRaphson_general_func import Ybus,Ybus_with_transformer, DefineVariable, Ufunc, Jacobian, PQ_given, NewtonRaphson, Result_values, NewtonRaphson2, NewtonRaphson3
+from Powerflow_NewtonRaphson_general_func2 import Ybus, Ybus_with_transformer, DefineVariable, Ufunc, Jacobian, PQ_given, NewtonRaphson
 
 data_name = "ac_case5.xlsx"
-# data_name = "ac_case3_fin.xlsx"
+
 # Read Data
 bus = pd.read_excel(data_name, sheet_name='bus')
+
 branch = pd.read_excel(data_name, sheet_name='branch')
 transformer = pd.read_excel(data_name, sheet_name='transformer')
 generator = pd.read_excel(data_name, sheet_name='generator')
@@ -24,109 +24,133 @@ generator_pu['PG (MW)'] = generator['PG (MW)'] / generator['MBASE (MW)']
 generator_pu['QG (MVAR)'] = generator['QG (MVAR)'] / generator['MBASE (MW)']
 generator_pu = generator_pu.rename(columns = {'PG (MW)' : 'PG (pu)', 'QG (MVAR)' : 'QG (pu)'})
 
-## Cal Ybus
+# Cal Ybus
+# ---------------------------------------------------------
+# Y             : Admittance matrix.
+# Y_mag         : Magnitude of the admittance.
+# Y_rad         : Admittance angle in radians.
+# Y_degrees     : Admittance angle in degree.
+# ---------------------------------------------------------
 if transformer.size == 0:
-    Y_mag, Y_rad = Ybus(bus_pu, branch)
+    Y_mag, Y_rad, Y_degrees, Y = Ybus(bus_pu, branch)
 else:
-    Y_mag, Y_rad, Y = Ybus_with_transformer(bus_pu, branch, transformer)
-# print(f"Y_mag : {Y_mag}\nY_rad : {Y_rad}")
-# print(f"Y : {Y}")
+    Y_mag, Y_rad, Y_degrees, Y = Ybus_with_transformer(bus_pu, branch, transformer)
+# print(f"Y : {Y}") # ok
+print('\n')
 
-## Define Variable and initial value
-V_mag, delta, sym_variables, indices_delta = DefineVariable(bus_pu, generator_pu)
-# print(len(sym_variables))
-# print(sym_variables)
+# Define Variable and initial Value
+# ---------------------------------------------------------
+# sym_variable  : Array of symbolic variable names [delta, V].
+# V_mag         : Magnitudes of voltage (V) or symbolic variables, ordered by bus sequence.
+# delta         : Phase angle values or symbolic variables, ordered by bus sequence.
+# indices_delta : Index positions of delta variables within sym_variable.
+# ---------------------------------------------------------
+V_mag, delta, sym_variables,sym_variables_init, indices_delta = DefineVariable(bus_pu, generator_pu)
+# print(f"V_mag               : {V_mag}")
+# print(f"delta               : {delta}")
+# print(f"sym_variable        : {sym_variables}")
+# print(f"sym_variable_init   : {sym_variables_init}")
+# print(f"len(indices_delta)  : {len(indices_delta)}")
+# print('\n')
 
-## PQ func
-Ufunc = Ufunc(bus_pu, Y_mag, Y_rad, V_mag, delta)
-# print(f"Ufunc : {Ufunc},  size :{Ufunc.shape}")
 
-## Jacobian
+# Bus     Volt    Angle     Real   Reactive
+# 1.0000   1.0600        0   1.3122   0.9759
+# 2.0000   1.0000  -2.0658   0.2000  -0.5617
+# 3.0000   0.9822  -4.5607  -0.4500  -0.1500
+# 4.0000   0.9789  -4.8791  -0.4000  -0.0500
+# 5.0000   0.9675  -5.7104  -0.6000  -0.1000
+
+# PG func
+# ---------------------------------------------------------
+# func          : Represents the P and Q functions for each bus, where the index corresponds to the bus number
+#                 (PQ bus: both P and Q functions, PV bus: P function only, Swing bus: None).
+# Ufunc         : Rearranges the func into [P, Q] format, with P and Q functions ordered sequentially by bus number
+#                 (i.e., P1, P2, P3,... followed by Q1, Q2, Q3,...).
+# U_given       : Fixed values for the Ufunc.
+# P_total       : Total active power, defined as the difference between generated power (PG) and load power (PL).
+# Q_total       : Total reactive power, defined as the difference between generated reactive power (QG) and load reactive power (QL).
+# ---------------------------------------------------------
+func, Ufunc, Ufunc_array_name= Ufunc(bus_pu, Y_mag, Y_rad, V_mag, delta)
+P_total, Q_total, U_given = PQ_given(bus_pu, generator_pu)
+# print(f"func                : {func}")
+# print(f"Ufunc_array_name    : {Ufunc_array_name}")
+# print(f"Ufunc               : {Ufunc}")
+# print(f"U_given             : {U_given}")
+# print('\n')
+
+# Jacobian
+# ---------------------------------------------------------
+# J             : The Jacobian matrix represented as a NumPy array.
+# J_matrix      : To facilitate substitution of values from x, convert J from a NumPy array to a SymPy matrix (sp.Matrix).
+# x_init        : A dictionary containing the initial values(sym_variables_init) for each variable(sym_variables).
+# J_init        : Initial Jacobian matrix (J) with x_init values substituted.
+# ----------------------------------------------------------
 J = Jacobian(bus_pu, Ufunc, sym_variables)
-print(f"J : {J}")
-## Given Data
-U_given = PQ_given(bus_pu, generator_pu)
-print(f"U_given :{U_given}")
+J_matrix = sp.Matrix(J)
+x_init = {}
+for i in range(len(sym_variables)):
+    x_init[sym_variables[i]] = sym_variables_init[i]
+J_init = np.array(J_matrix.subs(x_init)).astype(np.float64)
+# print(f"x_init              : {x_init}")
+# print(f"J {J.shape}        : \n{J}")
+# print(f"J_init              : \n{np.array(J_matrix.subs(x_init)).astype(np.float64)}") # 초기 자코비안 값이 받은 값과 약간의 차이가 남..! 확인 필요
+# print('\n')
 
-
-## iteration
+# iteration
 tolerance = 1e-6
-# tolerance = 1
-max_iter = 10
+max_iter = 100
 iteration = 0
 converged = False
 
-# 맨 초기값인데 엑셀 데이터 고려해서 수정할 필요 있음.
-x = {}
-for var in sym_variables:
-    if "delta" in str(var):
-        x[var] = 0
-    if "V" in str(var):
-        x[var] = 1
-start_time = time.time()
-print(f"Jacobian_init : {J.subs(x).evalf()}")
-while not converged or iteration < max_iter:
-    # print(f"x :{x}")
-    # print(f"iter = {iteration}")
-    Ufunc_cal = Ufunc.subs(x)
-    del_U = np.zeros(len(bus_pu))
-    # print(f"Ufunc_cal :{Ufunc_cal}  {type(Ufunc_cal)}, del_U :{del_U}")
-    # print(f"Ugiven :{U_given},  {type(U_given)}")
-    for i in range(len(bus_pu)):
-        del_U[i] = U_given[i] - Ufunc_cal[i]
+x = x_init
+J = J_init
+# print(f"x                   : {x}")
+U_cal = Ufunc.subs(x)
+U_given = sp.Matrix(U_given)
+# del_U = U_given - U_cal
+# print(f"U_given{type(U_given)}: {U_given}")
+# print(f"U_cal{type(U_cal)} : {U_cal}")
+# print(f"del_U              : {del_U}")
+# if all([abs(element) < 1.38 for element in del_U]):
+#     print("FFF")
 
-    print(f"abs(del_U) :{abs(del_U)}")
-    if np.all(abs(del_U) < tolerance):
-    # if np.all(abs(del_x) < tolerance):
+
+while not converged and iteration < max_iter:
+    U_cal = Ufunc.subs(x)
+    del_U = U_given - U_cal
+    if all([abs(element) < tolerance for element in del_U]):
         converged = True
-        print(f"converged at i = {iteration}, x = {x}, Ufunc_cal = {Ufunc_cal}")
+        print(f"Converged at i = {iteration}, x = {x}, U_cal = {U_cal}")
         break
-    x, del_x = NewtonRaphson3(x, Ufunc, bus_pu, U_given, J, indices_delta)
+    x, del_x = NewtonRaphson(x, J_matrix, del_U, indices_delta)
     iteration += 1
-    print(f"iter = {iteration}")
-    print("------------- %s seconds--------------" % (time.time() - start_time))
+    print(f"i = {iteration}")
 
+# Result
+# V_mag 와 delta사용하면 될 듯
+V_mag_result = [x.get(var, var) for var in V_mag]
+delta_result = [x.get(var, var) for var in delta]
+print(f"V_mag_result       : {V_mag_result}")
+print(f"delta_result       : {delta_result}")
 
-## Results
-V_result, delta_result, P_result, Q_result = Result_values(x, bus_pu, V_mag, delta, Y_mag, Y_rad)
+# =======
+'''
+# Initialize P and Q arrays
+n = len(bus_pu)
+P = np.zeros(n)
+Q = np.zeros(n)
 
-bus = []
-delta_result_degree = np.zeros(len(delta_result))
-for i in range(len(bus_pu)):
-    bus.append(i+1)
-    delta_result_degree = delta_result * 180 / np.pi
+# Power flow calculations for each bus
+for i in range(n):
+    for j in range(n):
+        P[i] += V_mag_result[i] * V_mag_result[j] * Y_mag[i, j] * np.cos(delta_result[i] - delta_result[j] - Y_rad[i, j])
+        Q[i] += V_mag_result[i] * V_mag_result[j] * Y_mag[i, j] * np.sin(delta_result[i] - delta_result[j] - Y_rad[i, j])
 
-## Save Data to excel file
-P_G = np.zeros(len(bus_pu))
-Q_G = np.zeros(len(bus_pu))
-P_load = np.zeros(len(bus_pu))
-Q_load = np.zeros(len(bus_pu))
-for i in range(len(generator_pu)):
-    print(generator_pu['Bus'] - 1)
-    P_G[generator_pu['Bus'] - 1] = generator_pu['PG (pu)'][i]
-    Q_G[generator_pu['Bus'] - 1] = generator_pu['QG (pu)'][i]
-for i in range(len(bus_pu)):
-    P_load[i] = bus_pu['Pload (pu)'][i]
-    Q_load[i] = bus_pu['Qload (pu)'][i]
+# Print results
+print("P values: ", P)
+print("Q values: ", Q)
 
-for i in range(len(bus_pu)):
-    if bus_pu['Type'][i] == 'Swing':
-        P_G[i] = P_result[i]
-        Q_G[i] = Q_result[i]
-    elif bus_pu['Type'][i] == 'PV':
-        Q_G[i] = Q_result[i] + Q_load[i]
-
-data = {
-    'Bus' : bus,
-    'Volt': V_result,
-    'Angle': delta_result_degree,
-    'PG': P_G,
-    'QG': Q_G,
-    'Pload': P_load,
-    'Qload': Q_load
-}
-
-df = pd.DataFrame(data)
-df.to_excel('powerflow_results.xlsx', index=False)
-
-print("The file has been saved!!!")
+print(f"---------------")
+print(np.cos(np.pi))
+print(np.cos(180))'''
